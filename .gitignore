@@ -1,0 +1,10 @@
+__*__/*
+*.pyc
+checkpoints
+*.pt
+GenerativeResults
+GenerativeResults/*
+results
+*.npy
+run_scripts/image_gen/toy_data/
+run_scripts/image_gen/toy_data/*
