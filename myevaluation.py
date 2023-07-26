@@ -1,32 +1,18 @@
-import logging
 import os
 import sys
-
-import argparse
-import base64
-from io import BytesIO
-from data.file_dataset import FileDataset
-from PIL import Image, ImageFile
-from torchvision import transforms
-from omegaconf import OmegaConf, DictConfig
-from models.taming.models.vqgan import GumbelVQ
-
 import torch
-from torch.utils.data import Dataset, DataLoader
-
-import numpy as np
-from tqdm import tqdm
-
-from fairseq import distributed_utils, options, tasks, utils
-from fairseq.dataclass.utils import convert_namespace_to_omegaconf
-from fairseq.logging import progress_bar
-from fairseq.utils import reset_logging
-
-from utils import checkpoint_utils
-from utils.eval_utils import eval_step, merge_results
-
-from run_scripts.image_gen import data_processing, generate_code
+import logging
 import evaluate
+
+from tqdm import tqdm
+from omegaconf import OmegaConf
+from PIL import Image, ImageFile
+from torch.utils.data import DataLoader
+from fairseq import distributed_utils, options
+from models.taming.models.vqgan import GumbelVQ
+from run_scripts.image_gen import data_processing, generate_code
+from fairseq.dataclass.utils import convert_namespace_to_omegaconf
+
 
 # for generate_code.py
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -52,7 +38,6 @@ class Eval(object):
 
 	# set configs for all the steps
 	def set_config(self):
-		# parser = argparse.ArgumentParser(description="data_processing")
 		parser = options.get_generation_parser()
 
 		# configs for data_processing.py
@@ -69,27 +54,20 @@ class Eval(object):
 		parser.add_argument("--vqgan_config_path", type=str, default=None)
 		parser.add_argument("--log_interval", default=100, type=int, help="log interval")
 		parser.add_argument("--worker_cnt", type=int, default=1)
-		# parser.add_argument("--local_rank", type=int, default=0)
 		parser.add_argument("--batch_size", type=int, default=32)
 
-		# the args for step1 and step2
-		# args = parser.parse_args()
-
 		# configs for evaluate.py
-		# parser2 = options.get_generation_parser()
 		parser.add_argument("--ema-eval", action='store_true', help="Use EMA weights to make evaluation.")
 		parser.add_argument("--beam-search-vqa-eval", action='store_true', help="Use beam search for vqa evaluation (faster inference speed but sub-optimal result), if not specified, we compute scores for each answer in the candidate set, which is slower but can obtain best result.")
 		parser.add_argument("--zero-shot", action='store_true')
-
 		parser.add_argument("--use-indicator", action='store_true', help="Use indication function when calculating OFA score")
 		parser.add_argument("--use-credit", action='store_true', help="Use credit assignment when calculating the final score, use patch-wise credit if True")
 		parser.add_argument("--use-image-credit", action='store_true', help="Use image-wise credit assignment when calculating the final score")
 		parser.add_argument("--use-smooth-exp", action='store_true', help="(Only if --use-image-credit=True) Use smooth exp function in image-wise credit assignment when calculating the final score")
 
-		# two arg files for the step3
 		args = options.parse_args_and_arch(parser)
 		cfg = convert_namespace_to_omegaconf(args)
-
+		breakpoint()
 		return args, cfg
 
 
@@ -143,7 +121,6 @@ class Eval(object):
 
 if __name__ == '__main__':
 	eval_tool = Eval()
-	# 
 	eval_tool.reformat_data()
 	eval_tool.gen_code()
 	eval_tool.get_score()

@@ -4,18 +4,18 @@
 # This source code is licensed under the Apache 2.0 license 
 # found in the LICENSE file in the root directory.
 
-import logging
+
 import os
 import sys
-
-import numpy as np
+import logging
 import torch
+import numpy as np
+
 from fairseq import distributed_utils, options, tasks, utils
 from fairseq.dataclass.utils import convert_namespace_to_omegaconf
 from fairseq.logging import progress_bar
 from fairseq.utils import reset_logging
 from omegaconf import DictConfig
-
 from utils import checkpoint_utils
 from utils.eval_utils import eval_step, merge_results
 
@@ -40,19 +40,9 @@ def apply_half(t):
 
 
 def ofa_score_mapping(ofa_scr, eps = 1.0):
-    # ofa_scr = np.asarray(ofa_scr)
-
-    # print(ofa_scr)
-    # print(type(ofa_scr))
-    # print(ofa_scr.mean())
-    # assert False
-
     threshold = (1./8192)*10
-    # threshold = 1./8192
-
     ofa_scr[ofa_scr<=threshold] = 0.0   # set to 0 if the porb<1/codebooksize
     ofa_scr[ofa_scr>threshold] = np.log(ofa_scr[ofa_scr>threshold]) - np.log(threshold)  # set to log if the prob>1/codebooksize
-
     # eps is the minimum socre and set to 1
     ofa_scr += eps
 
@@ -70,11 +60,8 @@ def calculate_score(ofa_scr, overrides, sample_id, use_indicator, clip_scr=None)
     else:
         fin_scr = ofa_scr
 
-    # print(fin_scr)
-    # print(fin_scr.shape)
     # save for visualizing
     np.save(os.path.join(overrides["output_path"], "{}_woall.npy".format(sample_id)), fin_scr)
-    # assert False
 
     naive_scr = fin_scr.mean()
     log_scr = fin_scr.mean()
@@ -135,20 +122,6 @@ def main_eval(cfg: DictConfig, **kwargs):
             num_shards=cfg.checkpoint.checkpoint_shard_count,
         )
 
-    # import sys
-    # class Logger(object):
-    #     def __init__(self, filename="model_architecture.txt"):
-    #         self.terminal = sys.stdout
-    #         self.log = open(filename, "w")
-    #     def write(self, message):
-    #         self.terminal.write(message)
-    #         self.log.write(message)
-    #     def flush(self):
-    #         pass
-    # sys.stdout = Logger("model_architecture.txt")
-    # print(models)
-    # assert False
-
     # loading the dataset should happen after the checkpoint has been loaded so we can give it the saved task config
     task.load_dataset(cfg.dataset.gen_subset, task_cfg=saved_cfg.task)
 
@@ -190,27 +163,9 @@ def main_eval(cfg: DictConfig, **kwargs):
     # Initialize generator
     generator = task.build_generator(models, cfg.generation)
 
-    # import sys
-    # class Logger(object):
-    #     def __init__(self, filename):
-    #         self.terminal = sys.stdout
-    #         self.log = open(filename, "w")
-    #     def write(self, message):
-    #         self.terminal.write(message)
-    #         self.log.write(message)
-    #     def flush(self):
-    #         pass
-    # sys.stdout = Logger("model_architecture_generator.txt")
-    # print(generator)
-    # assert False
-
     results = []
     score_sum = torch.FloatTensor([0]).cuda()
     score_cnt = torch.FloatTensor([0]).cuda()
-    # ofas_dict = {}
-    # clips_dict = {}
-    # print(overrides)
-    # assert False
     clip_tool = clip.CLIPTool(clip_mode=overrides["clip_mode"])
     for sample in progress:
         # ofa
@@ -219,37 +174,25 @@ def main_eval(cfg: DictConfig, **kwargs):
         sample = utils.move_to_cuda(sample) if use_cuda else sample
         sample = utils.apply_to_sample(apply_half, sample) if cfg.common.fp16 else sample
         with torch.no_grad():
-            # result, scores = eval_step(task, generator, models, sample, **kwargs)
             result, scores, probs_list = eval_step(task, generator, models, sample, cfg, **kwargs)
         results += result
         score_sum += sum(scores) if scores is not None else 0
         score_cnt += len(scores) if scores is not None else 0
         progress.log({"sentences": sample["nsentences"]})
 
-        # # collect probs dict
-        # ofas_dict[sample["id"][0]] = np.asarray(probs_list)
+        # collect probs dict
         ofa_scr = np.asarray(probs_list)
 
         # clip
         image_path = os.path.join(overrides["image_path"], "{:012d}.jpg".format(int(sample["code_images"])))
-        # image_path = os.path.join(overrides["image_path"], "{}.jpg".format(sample["code_images"][0]))
-        # image_path = sample["code_images"]
 
         if kwargs['use_credit'] or kwargs['use_image_credit']:
             clip_scr = clip_tool.clip_score(image_path=image_path, caption=sample["text"][0], output_path=overrides["output_path"], mask_size=32, use_credit = kwargs['use_credit'], use_image_credit=kwargs['use_image_credit'], use_smooth_exp=kwargs['use_smooth_exp'])
         else:
             clip_scr = None
 
-        # # collect clip dict
-        # clips_dict[sample["id"][0]] = clip_scr
-
         # calculate and save the scores
         calculate_score(ofa_scr=ofa_scr, overrides=overrides, sample_id=sample["id"][0], clip_scr=clip_scr, use_indicator=kwargs['use_indicator'])
-
-    # # calculate and save the scores
-    # calculate_score(ofas_dict, clips_dict, overrides)
-    # 
-    # merge_results(task, cfg, logger, score_cnt, score_sum, results)
 
 
 def cli_main():

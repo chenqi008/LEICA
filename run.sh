@@ -4,7 +4,6 @@
 # input parameters
 # ====================================================
 # (Step 1)
-# data_path=/home/qichen/Desktop/Evaluation/MyEvaluation/run_scripts/image_gen/toy_data/coco_karpathy_split/Curve/GB1_C
 data_path=GenerativeResults/vq_diffusion
 custom_data_filename=custom_data.txt
 custom_data_code_filename=custom_data_code.txt
