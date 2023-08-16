@@ -314,37 +314,22 @@ class ImageGenTask(OFATask):
     def inference_image(self, generator, sample, models, cfg):
         hyps, ref = [], None
         for j in range(self.sampling_times):
-            # gen_out = self.inference_step(generator, models, sample)
             gen_out, probs_list = self.inference_step(generator, models, sample)
-            # print(len(gen_out), "111111111111111111111111111111111111111")
             for i in range(len(gen_out)):
                 with torch.no_grad():
-                    # print(gen_out[i][0]['tokens'])
-                    # print(len(gen_out[i][0]['tokens']), "222222222222222222222222")
-                    # assert False
                     # save selected index from codebook
-                    temp = ', '.join(['{}'.format(x_) for x_ in gen_out[i][0]['tokens'][:-1]])
-                    temp = temp + '\n'
-                    with open("./code_stat.txt", "a") as f:
-                        f.write(temp)
+                    # temp = ', '.join(['{}'.format(x_) for x_ in gen_out[i][0]['tokens'][:-1]])
+                    # temp = temp + '\n'
+                    # with open("./code_stat.txt", "a") as f:
+                    #     f.write(temp)
 
                     tokens = torch.stack([item['tokens'][:-1] for item in gen_out[i]], dim=0)
-                    # print(tokens)
                     tokens += -len(self.src_dict) + self.cfg.code_dict_size + self.cfg.num_bins
-                    # print(tokens)
-                    # print(tokens.shape)
-                    # assert False
                     images = self.image_tokenizer.decode_code(
                         tokens.view(-1, self.cfg.code_image_size // 8, self.cfg.code_image_size // 8)
                     )
                     images = [custom_to_pil(image) for image in images]
                 hyps += images
-        # if 'code_images' in sample:
-        #     ref = Image.open(BytesIO(base64.urlsafe_b64decode(sample['code_images'][0]))).convert('RGB')
-            # overrides = eval(cfg.common_eval.model_overrides)
-            # ref = Image.open(os.path.join(overrides["image_path"], "{:012d}.jpg".format(int(sample["code_images"]))))
-            # print(ref)
-            # assert False
 
         # return hyps, ref
         return hyps, probs_list

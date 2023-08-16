@@ -133,6 +133,6 @@ class Eval(object):
 if __name__ == '__main__':
 	eval_tool = Eval()
 	eval_tool.reformat_data()
-	# eval_tool.gen_code()
+	eval_tool.gen_code()
 	eval_tool.get_score()
 
