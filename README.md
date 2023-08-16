@@ -8,8 +8,8 @@ unzip checkpoints.zip
 ```
 Download OFA pre-trained checkpoints from [Pre-trained checkpoint (OFA-large)(5.9GB)](https://ofa-beijing.oss-cn-beijing.aliyuncs.com/checkpoints/ofa_large.pt) and [Pre-trained checkpoint (OFA-Base)(5.9GB))](https://ofa-beijing.oss-cn-beijing.aliyuncs.com/checkpoints/ofa_base.pt).
 ```
-wget https://ofa-beijing.oss-cn-beijing.aliyuncs.com/checkpoints/ofa_large.ptt
 wget https://ofa-beijing.oss-cn-beijing.aliyuncs.com/checkpoints/ofa_large.pt
+wget https://ofa-beijing.oss-cn-beijing.aliyuncs.com/checkpoints/ofa_base.pt
 ```
 Then put them into checkpoints dir.
 ```
