@@ -186,6 +186,7 @@ def main_eval(cfg: DictConfig, **kwargs):
         with torch.no_grad():
             result, scores, probs_list = eval_step(task, generator, models, sample, cfg, **kwargs)
         results += result
+        breakpoint()
         score_sum += sum(scores) if scores is not None else 0
         score_cnt += len(scores) if scores is not None else 0
         progress.log({"sentences": sample["nsentences"]})

@@ -20,16 +20,10 @@ bpe_dir=utils/BPE
 path=./checkpoints/image_gen_large_best.pt
 selected_cols=0,1,2,3
 split='test'
-
-type=dalle
-VQGAN_MODEL_PATH=checkpoints/min_dalle/last.ckpt
-VQGAN_CONFIG_PATH=checkpoints/min_dalle/model.yaml
-if [ $1 == 'ofa' ]; then
-  type=ofa
-  VQGAN_MODEL_PATH=checkpoints/vqgan/last.ckpt
-  VQGAN_CONFIG_PATH=checkpoints/vqgan/model.yaml
-fi
-
+# VQGAN_MODEL_PATH=checkpoints/min_dalle/last.ckpt
+# VQGAN_CONFIG_PATH=checkpoints/min_dalle/model.yaml
+VQGAN_MODEL_PATH=checkpoints/vqgan/last.ckpt
+VQGAN_CONFIG_PATH=checkpoints/vqgan/model.yaml
 CLIP_MODEL_PATH=./checkpoints/clip/ViT-B-16.pt
 GEN_IMAGE_PATH=./results/image_gen
 
@@ -42,7 +36,7 @@ clip_mode=base-p16-224
 
 
 CUDA_VISIBLE_DEVICES=0 python myevaluation.py \
-  --type ${type} \
+  --type ofa \
   --data_path=${data_path} \
   --custom_data_filename=${custom_data_filename} \
   --file=${custom_data} \
