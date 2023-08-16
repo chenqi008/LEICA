@@ -11,6 +11,10 @@ import logging
 import torch
 import numpy as np
 
+from math import sqrt
+from data.dalle_dataset import Dataset
+from models.min_dalle import MinDalle
+from omegaconf import OmegaConf
 from fairseq import distributed_utils, options, tasks, utils
 from fairseq.dataclass.utils import convert_namespace_to_omegaconf
 from fairseq.logging import progress_bar
@@ -22,7 +26,7 @@ from utils.eval_utils import eval_step, merge_results
 # for clip
 from clip import clip
 from clip.visualizer import visualize_attention
-
+from models.taming.models.vqgan import GumbelVQ, VQModel
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -40,6 +44,7 @@ def apply_half(t):
 
 
 def ofa_score_mapping(ofa_scr, eps = 1.0):
+    #TODO
     threshold = (1./8192)*10
     ofa_scr[ofa_scr<=threshold] = 0.0   # set to 0 if the porb<1/codebooksize
     ofa_scr[ofa_scr>threshold] = np.log(ofa_scr[ofa_scr>threshold]) - np.log(threshold)  # set to log if the prob>1/codebooksize
@@ -56,6 +61,11 @@ def calculate_score(ofa_scr, overrides, sample_id, use_indicator, clip_scr=None)
         ofa_scr = ofa_score_mapping(ofa_scr)
 
     if clip_scr is not None:
+        if clip_scr.shape[0] != ofa_scr.shape[0]:
+            # Bilinear interpolation
+            ofa_scr = torch.from_numpy(ofa_scr).view(int(sqrt(ofa_scr.shape[0])), int(sqrt(ofa_scr.shape[0]))).unsqueeze(0).unsqueeze(0)
+            ofa_scr = torch.functional.F.interpolate(ofa_scr, size=(int(sqrt(clip_scr.shape[0])), int(sqrt(clip_scr.shape[0]))), mode='bilinear', align_corners=False)
+            ofa_scr = ofa_scr.view(-1).numpy()
         fin_scr = np.multiply(clip_scr, ofa_scr)
     else:
         fin_scr = ofa_scr
@@ -167,8 +177,8 @@ def main_eval(cfg: DictConfig, **kwargs):
     score_sum = torch.FloatTensor([0]).cuda()
     score_cnt = torch.FloatTensor([0]).cuda()
     clip_tool = clip.CLIPTool(clip_mode=overrides["clip_mode"])
+
     for sample in progress:
-        # ofa
         if "net_input" not in sample:
             continue
         sample = utils.move_to_cuda(sample) if use_cuda else sample
@@ -176,6 +186,7 @@ def main_eval(cfg: DictConfig, **kwargs):
         with torch.no_grad():
             result, scores, probs_list = eval_step(task, generator, models, sample, cfg, **kwargs)
         results += result
+        breakpoint()
         score_sum += sum(scores) if scores is not None else 0
         score_cnt += len(scores) if scores is not None else 0
         progress.log({"sentences": sample["nsentences"]})
@@ -193,6 +204,47 @@ def main_eval(cfg: DictConfig, **kwargs):
 
         # calculate and save the scores
         calculate_score(ofa_scr=ofa_scr, overrides=overrides, sample_id=sample["id"][0], clip_scr=clip_scr, use_indicator=kwargs['use_indicator'])
+
+def dalle_eval(cfg: DictConfig, args, **kwargs):
+    dalle_dataset = Dataset(path=args.outputs)
+    overrides = eval(cfg.common_eval.model_overrides)
+    vqgan_config = OmegaConf.load(args.vqgan_config_path)
+    vqgan = VQModel(**vqgan_config.model.params)
+    mindalle = MinDalle(
+        models_root='./pretrained',
+        dtype=torch.float16,
+        device='cuda',
+        is_mega=True, 
+        is_reusable=True
+    )
+    mindalle.detokenizer.decoder = vqgan.decoder
+
+    clip_tool = clip.CLIPTool(clip_mode=overrides["clip_mode"])
+    for sample in dalle_dataset:
+        probs_list = mindalle.generate_logits(
+            text=sample['caption'],
+            image_tokens=sample['code'].cuda(),
+            seed=-1,
+            grid_size=1,
+            is_seamless=False,
+            temperature=1,
+            top_k=256,
+            supercondition_factor=16,
+            is_verbose=False
+        )
+        # collect probs dict
+        ofa_scr = np.asarray(probs_list)
+
+        # clip
+        image_path = os.path.join(overrides["image_path"], "{:012d}.jpg".format(int(sample["id"])))
+
+        if kwargs['use_credit'] or kwargs['use_image_credit']:
+            clip_scr = clip_tool.clip_score(image_path=image_path, caption=sample["caption"], output_path=overrides["output_path"], mask_size=32, use_credit = kwargs['use_credit'], use_image_credit=kwargs['use_image_credit'], use_smooth_exp=kwargs['use_smooth_exp'])
+        else:
+            clip_scr = None
+
+        # calculate and save the scores
+        calculate_score(ofa_scr=ofa_scr, overrides=overrides, sample_id=sample["id"], clip_scr=clip_scr, use_indicator=kwargs['use_indicator'])
 
 
 def cli_main():

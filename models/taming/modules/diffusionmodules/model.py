@@ -512,12 +512,10 @@ class Decoder(nn.Module):
 
         # z to block_in
         h = self.conv_in(z)
-
         # middle
         h = self.mid.block_1(h, temb)
         h = self.mid.attn_1(h)
         h = self.mid.block_2(h, temb)
-
         # upsampling
         for i_level in reversed(range(self.num_resolutions)):
             for i_block in range(self.num_res_blocks+1):

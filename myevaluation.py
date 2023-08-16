@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 from PIL import Image, ImageFile
 from torch.utils.data import DataLoader
 from fairseq import distributed_utils, options
-from models.taming.models.vqgan import GumbelVQ
+from models.taming.models.vqgan import GumbelVQ, VQModel
 from run_scripts.image_gen import data_processing, generate_code
 from fairseq.dataclass.utils import convert_namespace_to_omegaconf
 
@@ -39,6 +39,7 @@ class Eval(object):
 	# set configs for all the steps
 	def set_config(self):
 		parser = options.get_generation_parser()
+		parser.add_argument("--type", type=str, required=True, choices=['ofa', 'dalle'], help="eval backbone.")
 
 		# configs for data_processing.py
 		parser.add_argument("--data_path", type=str, required=True, help="the path of the original data, including both text and image.")
@@ -67,7 +68,7 @@ class Eval(object):
 
 		args = options.parse_args_and_arch(parser)
 		cfg = convert_namespace_to_omegaconf(args)
-		breakpoint()
+
 		return args, cfg
 
 
@@ -80,7 +81,13 @@ class Eval(object):
 	# generate code according to the pretrained codebook
 	def gen_code(self):
 		vqgan_config = OmegaConf.load(self.args.vqgan_config_path)
-		vqgan = GumbelVQ(**vqgan_config.model.params)
+
+		if self.args.type == "ofa":
+			vqgan = GumbelVQ(**vqgan_config.model.params)
+
+		elif self.args.type == "dalle":
+			vqgan = VQModel(**vqgan_config.model.params)
+
 		sd = torch.load(self.args.vqgan_model_path, map_location="cpu")["state_dict"]
 		missing, unexpected = vqgan.load_state_dict(sd, strict=False)
 		for k, v in vqgan.named_parameters():
@@ -116,12 +123,16 @@ class Eval(object):
 
 	# obtain the score from score-based model
 	def get_score(self):
-		distributed_utils.call_main(self.cfg, evaluate.main_eval, ema_eval=self.args.ema_eval, beam_search_vqa_eval=self.args.beam_search_vqa_eval, zero_shot=self.args.zero_shot, use_indicator=self.args.use_indicator, use_credit=self.args.use_credit, use_image_credit=self.args.use_image_credit, use_smooth_exp=self.args.use_smooth_exp)
+		if self.args.type == "ofa":
+			distributed_utils.call_main(self.cfg, evaluate.main_eval, ema_eval=self.args.ema_eval, beam_search_vqa_eval=self.args.beam_search_vqa_eval, zero_shot=self.args.zero_shot, use_indicator=self.args.use_indicator, use_credit=self.args.use_credit, use_image_credit=self.args.use_image_credit, use_smooth_exp=self.args.use_smooth_exp)
+
+		elif self.args.type == "dalle":
+			evaluate.dalle_eval(self.cfg, self.args, ema_eval=self.args.ema_eval, beam_search_vqa_eval=self.args.beam_search_vqa_eval, zero_shot=self.args.zero_shot, use_indicator=self.args.use_indicator, use_credit=self.args.use_credit, use_image_credit=self.args.use_image_credit, use_smooth_exp=self.args.use_smooth_exp)
 
 
 if __name__ == '__main__':
 	eval_tool = Eval()
 	eval_tool.reformat_data()
-	eval_tool.gen_code()
+	# eval_tool.gen_code()
 	eval_tool.get_score()
 

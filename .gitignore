@@ -8,3 +8,5 @@ results
 *.npy
 run_scripts/image_gen/toy_data/
 run_scripts/image_gen/toy_data/*
+tmp/
+pretrained/
