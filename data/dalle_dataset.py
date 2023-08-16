@@ -27,5 +27,4 @@ if __name__ == '__main__':
     dataset = Dataset(path='GenerativeResults/vq_diffusion/custom_data_code.txt')
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
     for batch in dataloader:
-        breakpoint()
         print(batch)
