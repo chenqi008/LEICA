@@ -1,5 +1,5 @@
 # LEICA
-The official code for "LEICA: Likelihood-Based Text-to-Image Evaluation with Credit Assignment"
+The official code for "LEICA: Likelihood-Based Text-to-lmage Evaluation withPatch-Level Perceptual and Semantic Credit Assignment"
 
 ## Download Checkpoints
 Download checkpoints.zip ([Baidu Netdisk](https://pan.baidu.com/s/1U-YASHgWu4LoMw8wufmKlQ?pwd=leic)[提取码:leic], [google drive]) and unzip it in the root directory of this project.
